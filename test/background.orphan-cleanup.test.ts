@@ -43,172 +43,52 @@ describe('Orphan Container Cleanup', () => {
     });
   });
 
-  describe('Cleanup.cleanupNow (manual "clean up now" action)', () => {
+  describe('Cleanup.cleanup orphan sweep', () => {
     it('removes an untracked orphan container with no open tabs', async () => {
       const { tmp: background, browser } = await loadBackground();
       browser.contextualIdentities.query.resolves([{ cookieStoreId: 'firefox-tmp7', name: 'tmp7' }]);
       browser.tabs.query.withArgs({ cookieStoreId: 'firefox-tmp7' }).resolves([]);
       browser.contextualIdentities.remove.resolves({});
 
-      const result = await background.cleanup.cleanupNow();
+      await background.cleanup.cleanup();
       await nextTick();
 
       browser.contextualIdentities.remove.should.have.been.calledOnceWith('firefox-tmp7');
       expect(background.storage.local.tempContainers['firefox-tmp7']).to.equal(undefined);
-      expect(result.removedOrphans).to.equal(1);
-      expect(result.removedTracked).to.equal(0);
     });
 
     it('skips an untracked orphan container that still has open tabs', async () => {
       const { tmp: background, browser } = await loadBackground();
       browser.contextualIdentities.query.resolves([{ cookieStoreId: 'firefox-tmp7', name: 'tmp7' }]);
-      browser.tabs.query.withArgs({ cookieStoreId: 'firefox-tmp7' }).resolves([{ id: 99 }]);
+      browser.tabs.query.withArgs({ cookieStoreId: 'firefox-tmp7' }).resolves([{ id: 1 }]);
 
-      const result = await background.cleanup.cleanupNow();
+      await background.cleanup.cleanup();
+      await nextTick();
 
       browser.contextualIdentities.remove.should.not.have.been.called;
-      expect(result.skippedHasTabs).to.equal(1);
-      expect(result.removedOrphans).to.equal(0);
     });
 
     it('never touches an untracked container whose name does not match the pattern', async () => {
       const { tmp: background, browser } = await loadBackground();
-      browser.contextualIdentities.query.resolves([{ cookieStoreId: 'firefox-work', name: 'work-stuff' }]);
-      browser.tabs.query.withArgs({ cookieStoreId: 'firefox-work' }).resolves([]);
+      browser.contextualIdentities.query.resolves([{ cookieStoreId: 'firefox-container-1', name: 'Work' }]);
+      browser.tabs.query.resolves([]);
 
-      const result = await background.cleanup.cleanupNow();
+      await background.cleanup.cleanup();
+      await nextTick();
 
       browser.contextualIdentities.remove.should.not.have.been.called;
-      expect(result.removedOrphans).to.equal(0);
-      expect(result.skippedHasTabs).to.equal(0);
     });
 
     it('does not sweep orphans when the preference is disabled', async () => {
       const { tmp: background, browser } = await loadBackground();
       background.storage.local.preferences.container.orphanSweep.active = false;
       browser.contextualIdentities.query.resolves([{ cookieStoreId: 'firefox-tmp7', name: 'tmp7' }]);
-      browser.tabs.query.withArgs({ cookieStoreId: 'firefox-tmp7' }).resolves([]);
+      browser.tabs.query.resolves([]);
 
-      const result = await background.cleanup.cleanupNow();
-
-      browser.contextualIdentities.query.should.not.have.been.called;
-      browser.contextualIdentities.remove.should.not.have.been.called;
-      expect(result.removedOrphans).to.equal(0);
-    });
-
-    it('removes an empty tracked container instantly, bypassing the removal delay', async () => {
-      const { tmp: background, browser, helper } = await loadBackground();
-      background.storage.local.preferences.container.removal = 900000;
-      await helper.openNewTmpTab({ createsTabId: 2, createsContainer: 'firefox-tmp1' });
-
-      browser.contextualIdentities.query.resolves([]);
-      browser.tabs.query.withArgs({ cookieStoreId: 'firefox-tmp1' }).resolves([]);
-      browser.contextualIdentities.remove.resolves({});
-
-      const result = await background.cleanup.cleanupNow();
+      await background.cleanup.cleanup();
       await nextTick();
 
-      browser.contextualIdentities.remove.should.have.been.calledOnceWith('firefox-tmp1');
-      expect(result.removedTracked).to.equal(1);
-    });
-
-    it('skips a tracked container that still has open tabs', async () => {
-      const { tmp: background, browser, helper } = await loadBackground();
-      await helper.openNewTmpTab({ createsTabId: 2, createsContainer: 'firefox-tmp1' });
-
-      browser.contextualIdentities.query.resolves([]);
-      browser.tabs.query.withArgs({ cookieStoreId: 'firefox-tmp1' }).resolves([{ id: 2 }]);
-
-      const result = await background.cleanup.cleanupNow();
-
       browser.contextualIdentities.remove.should.not.have.been.called;
-      expect(result.removedTracked).to.equal(0);
-      expect(result.skippedHasTabs).to.equal(1);
-    });
-
-    it('expedites a container already queued by the automatic removal delay, instead of silently no-opping', async () => {
-      const { tmp: background, browser, helper, clock } = await loadBackground();
-      background.storage.local.preferences.container.removal = 900000;
-      await helper.openNewTmpTab({ createsTabId: 2, createsContainer: 'firefox-tmp1' });
-
-      browser.contextualIdentities.query.resolves([]);
-      browser.tabs.query.withArgs({ cookieStoreId: 'firefox-tmp1' }).resolves([]);
-      browser.contextualIdentities.remove.resolves({});
-
-      // Tab closes: this is what actually happens first in real usage - the
-      // automatic removal path (tabs.onRemoved -> addToRemoveQueue) queues the
-      // container and starts waiting out the full 15-minute removal delay.
-      browser.tabs.onRemoved.addListener.yield(2);
-      await nextTick();
-      browser.contextualIdentities.remove.should.not.have.been.called;
-
-      // User clicks "Clean up empty temporary containers" well before that
-      // delay elapses. It must expedite the already-queued removal instead of
-      // silently no-opping because the container is already marked "queued".
-      const result = await background.cleanup.cleanupNow();
-      expect(result.removedTracked).to.equal(1);
-      await clock.tickAsync(3000);
-
-      browser.contextualIdentities.remove.should.have.been.calledOnceWith('firefox-tmp1');
-    });
-
-    it('removes every container in a multi-container batch, not just the first', async () => {
-      const { tmp: background, browser, helper, clock } = await loadBackground();
-      await helper.openNewTmpTab({ tabId: 1, createsTabId: 2, createsContainer: 'firefox-tmp1' });
-      await helper.openNewTmpTab({ tabId: 1, createsTabId: 3, createsContainer: 'firefox-tmp2' });
-      await helper.openNewTmpTab({ tabId: 1, createsTabId: 4, createsContainer: 'firefox-tmp3' });
-
-      browser.contextualIdentities.query.resolves([]);
-      browser.tabs.query.withArgs({ cookieStoreId: 'firefox-tmp1' }).resolves([]);
-      browser.tabs.query.withArgs({ cookieStoreId: 'firefox-tmp2' }).resolves([]);
-      browser.tabs.query.withArgs({ cookieStoreId: 'firefox-tmp3' }).resolves([]);
-      browser.contextualIdentities.remove.resolves({});
-
-      const result = await background.cleanup.cleanupNow();
-      expect(result.removedTracked).to.equal(3);
-
-      // The shared PQueue (concurrency 1) processes removals one at a time with a
-      // 2.5s pacing delay after each success before starting the next, so a 3-item
-      // batch needs the fake clock fully drained, not just a single tick/nextTick.
-      await clock.tickAsync(3 * 2500 + 1000);
-
-      browser.contextualIdentities.remove.should.have.been.calledWith('firefox-tmp1');
-      browser.contextualIdentities.remove.should.have.been.calledWith('firefox-tmp2');
-      browser.contextualIdentities.remove.should.have.been.calledWith('firefox-tmp3');
-      expect(browser.contextualIdentities.remove.callCount).to.equal(3);
-    });
-
-    it('reports a combined tracked + orphan sweep result', async () => {
-      const { tmp: background, browser, helper } = await loadBackground();
-      await helper.openNewTmpTab({ createsTabId: 2, createsContainer: 'firefox-tmp1' });
-
-      browser.contextualIdentities.query.resolves([
-        { cookieStoreId: 'firefox-tmp7', name: 'tmp7' },
-        { cookieStoreId: 'firefox-tmp8', name: 'tmp8' },
-        { cookieStoreId: 'firefox-work', name: 'work-stuff' },
-      ]);
-      browser.tabs.query.withArgs({ cookieStoreId: 'firefox-tmp1' }).resolves([]);
-      browser.tabs.query.withArgs({ cookieStoreId: 'firefox-tmp7' }).resolves([]);
-      browser.tabs.query.withArgs({ cookieStoreId: 'firefox-tmp8' }).resolves([{ id: 42 }]);
-      browser.tabs.query.withArgs({ cookieStoreId: 'firefox-work' }).resolves([]);
-      browser.contextualIdentities.remove.resolves({});
-
-      const result = await background.cleanup.cleanupNow();
-
-      expect(result).to.deep.equal({ removedTracked: 1, removedOrphans: 1, skippedHasTabs: 1 });
-    });
-  });
-
-  describe('runtime.onMessage cleanupEmptyTemporaryContainers', () => {
-    it('resolves with the cleanupNow result', async () => {
-      const { tmp: background, browser } = await loadBackground();
-      browser.contextualIdentities.query.resolves([{ cookieStoreId: 'firefox-tmp7', name: 'tmp7' }]);
-      browser.tabs.query.withArgs({ cookieStoreId: 'firefox-tmp7' }).resolves([]);
-      browser.contextualIdentities.remove.resolves({});
-
-      const result = await background.runtime.onMessage({ method: 'cleanupEmptyTemporaryContainers' } as any, {});
-
-      expect(result).to.deep.equal({ removedTracked: 0, removedOrphans: 1, skippedHasTabs: 0 });
     });
   });
 

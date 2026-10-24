@@ -134,18 +134,6 @@
   "optionsActionsNotAvailable": {
     "message": "Actions are not available in this tab"
   },
-  "optionsActionsCleanupOrphans": {
-    "message": "Clean up empty temporary containers"
-  },
-  "optionsActionsCleanupOrphansConfirm": {
-    "message": "This will immediately queue all empty Temporary Containers for removal, bypassing their normal removal delay, and - if orphan cleanup is enabled in Advanced Settings - also remove orphaned containers not created on this device (for example ones synced in via Firefox's container sync). Containers are removed gradually in the background, a few seconds apart, so it may take a while for a large number of them to disappear. This cannot be undone. Continue?"
-  },
-  "optionsActionsCleanupOrphansSuccess": {
-    "message": "Queued $1 temporary container(s) and $2 orphaned container(s) for removal ($3 skipped because they still have open tabs). They are removed gradually in the background, so it may take a moment before they disappear from about:preferences#containers."
-  },
-  "optionsActionsCleanupOrphansError": {
-    "message": "Failed to clean up temporary containers"
-  },
   "optionsAdvancedMisc": {
     "message": "Advanced Settings"
   },

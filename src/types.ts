@@ -22,12 +22,6 @@ export interface ContainerOptions {
   };
 }
 
-export interface OrphanSweepResult {
-  removedTracked: number;
-  removedOrphans: number;
-  skippedHasTabs: number;
-}
-
 export interface CreateTabOptions {
   cookieStoreId: CookieStoreId;
   url?: string;

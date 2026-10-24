@@ -179,18 +179,6 @@
   "optionsActionsNotAvailable": {
     "message": "Bu sekmede eylemler mevcut değil"
   },
-  "optionsActionsCleanupOrphans": {
-    "message": "Boş geçici konteynerleri temizle"
-  },
-  "optionsActionsCleanupOrphansConfirm": {
-    "message": "Bu işlem, normal kaldırma gecikmesini atlayarak tüm boş Geçici Konteynerleri hemen kaldırma sırasına alacak ve - Gelişmiş Ayarlar'da yetim konteyner temizliği etkinse - bu cihazda oluşturulmamış konteynerleri de (örneğin Firefox'un konteyner senkronizasyonuyla senkronize edilenler) kaldıracaktır. Konteynerler arka planda birkaç saniye arayla kademeli olarak kaldırılır, bu nedenle çok sayıda konteynerin kaybolması biraz zaman alabilir. Bu işlem geri alınamaz. Devam edilsin mi?"
-  },
-  "optionsActionsCleanupOrphansSuccess": {
-    "message": "$1 geçici ve $2 yetim konteyner kaldırma sırasına alındı ($3 tanesi hâlâ açık sekmeleri olduğu için atlandı). Bunlar arka planda kademeli olarak kaldırılır, bu yüzden about:preferences#containers sayfasından kaybolmaları biraz zaman alabilir."
-  },
-  "optionsActionsCleanupOrphansError": {
-    "message": "Geçici konteynerler temizlenemedi"
-  },
   "optionsAdvancedMisc": {
     "message": "Gelişmiş Ayarlar"
   },
